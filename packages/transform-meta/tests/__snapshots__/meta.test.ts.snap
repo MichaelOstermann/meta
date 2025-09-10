@@ -1,0 +1,41 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`meta > should ensure unique identifiers 1`] = `
+"
+const path1 = "source.ts";
+const meta1 = { path: path1, line: 4, name: "example" };
+const meta2 = { path: path1, line: 5, name: "example" };
+const meta3 = { path: path1, line: 6, name: "example" };
+const meta4 = { path: path1, line: 7, name: "example" };
+        const path = "example"
+        const meta = "example"
+        const example = foo(meta1)
+        const example = foo(meta2)
+        const example = foo(meta3)
+        const example = foo(meta4)
+        "
+`;
+
+exports[`meta > should find and use different identifiers 1`] = `
+"
+const path = "source.ts";
+const meta = { path: path, line: 3, name: "a" };
+const meta1 = { path: path, line: 7, name: "b.c" };
+const meta2 = { path: path, line: 11, name: "D.e" };
+const meta3 = { path: path, line: 13, name: "D.f.g" };
+        function a() {
+            return foo(meta)
+        }
+        
+        const b = {
+            c: foo(meta1)
+        }
+        
+        class D {
+            e = foo(meta2)
+            f() {
+                this.g = foo(meta3)
+            }
+        }
+        "
+`;

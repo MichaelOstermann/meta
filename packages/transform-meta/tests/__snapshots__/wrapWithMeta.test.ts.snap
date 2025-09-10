@@ -1,0 +1,41 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`wrapWithMeta > should not introduce conflicting imports 1`] = `
+"
+import { withMeta as withMeta1 } from "@monstermann/meta";
+const path = "source.ts";
+const meta = { path: path, line: 3, name: "example" };
+        const withMeta = "example"
+        const example = withMeta1(meta, () => foo())
+        "
+`;
+
+exports[`wrapWithMeta > should reuse existing imports 1`] = `
+"
+        import { withMeta as wrap } from "@monstermann/meta";
+const path = "source.ts";
+const meta = { path: path, line: 3, name: "example" };
+        const example = wrap(meta, () => foo())
+        "
+`;
+
+exports[`wrapWithMeta > should wrap call expressions with nested member expressions 1`] = `
+"
+import { withMeta } from "@monstermann/meta";
+const path = "source.ts";
+const meta = { path: path, line: 1, name: "example" };const example = withMeta(meta, () => foo.bar.baz())"
+`;
+
+exports[`wrapWithMeta > should wrap new expressions 1`] = `
+"
+import { withMeta } from "@monstermann/meta";
+const path = "source.ts";
+const meta = { path: path, line: 1, name: "example" };const example = withMeta(meta, () => new Foo())"
+`;
+
+exports[`wrapWithMeta > should wrap simple call expressions 1`] = `
+"
+import { withMeta } from "@monstermann/meta";
+const path = "source.ts";
+const meta = { path: path, line: 1, name: "example" };const example = withMeta(meta, () => foo())"
+`;

@@ -1,0 +1,35 @@
+{
+    "name": "@monstermann/meta",
+    "type": "module",
+    "version": "0.0.0",
+    "description": "Tools to attach metadata to call expressions.",
+    "author": "Michael Ostermann <michaelostermann@me.com>",
+    "license": "MIT",
+    "homepage": "https://MichaelOstermann.github.io/meta",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/MichaelOstermann/meta.git"
+    },
+    "bugs": {
+        "url": "https://github.com/MichaelOstermann/meta/issues"
+    },
+    "keywords": [],
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "bundle": "tsdown",
+        "release": "bun publish --access public"
+    },
+    "dependencies": {}
+}

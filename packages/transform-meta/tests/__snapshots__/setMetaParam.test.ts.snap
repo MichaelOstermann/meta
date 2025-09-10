@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`setMetaParam > should set call expressions with nested member expressions 1`] = `
+"
+const path = "source.ts";
+const meta = { path: path, line: 2, name: "example" };
+const meta1 = { path: path, line: 3, name: "example" };
+const meta2 = { path: path, line: 4, name: "example" };
+        const example = foo.bar.baz(undefined, meta)
+        const example = foo.bar.baz(bar, meta1)
+        const example = foo.bar.baz(bar, baz)
+        "
+`;
+
+exports[`setMetaParam > should set new expressions 1`] = `
+"
+const path = "source.ts";
+const meta = { path: path, line: 2, name: "example" };
+const meta1 = { path: path, line: 3, name: "example" };
+const meta2 = { path: path, line: 4, name: "example" };
+        const example = new Foo()
+        const example = new Foo(bar)
+        const example = new Foo(bar, baz)
+        "
+`;
+
+exports[`setMetaParam > should set simple call expressions 1`] = `
+"
+const path = "source.ts";
+const meta = { path: path, line: 2, name: "example" };
+const meta1 = { path: path, line: 3, name: "example" };
+const meta2 = { path: path, line: 4, name: "example" };
+        const example = foo(undefined, meta)
+        const example = foo(bar, meta1)
+        const example = foo(bar, baz)
+        "
+`;
