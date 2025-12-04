@@ -1,13 +1,9 @@
 {
-    "extends": "@sindresorhus/tsconfig",
+    "extends": "@monstermann/tsconfig",
     "compilerOptions": {
-        "lib": ["DOM", "DOM.Iterable", "ES2023"],
-        "module": "ESNext",
-        "moduleResolution": "bundler",
         "paths": {
             "@monstermann/transform-meta": ["./packages/transform-meta/src/index.ts"]
-        },
-        "noEmit": true
+        }
     },
     "exclude": [
         "**/dist/**",
