@@ -18,11 +18,11 @@
     },
     "packages/meta": {
       "name": "@monstermann/meta",
-      "version": "0.1.0",
+      "version": "0.1.1",
     },
     "packages/transform-meta": {
       "name": "@monstermann/transform-meta",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "@jridgewell/remapping": "^2.3.4",
         "@jridgewell/sourcemap-codec": "^1.5.4",
@@ -33,7 +33,7 @@
     },
     "packages/unplugin-meta": {
       "name": "@monstermann/unplugin-meta",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "@monstermann/transform-meta": "workspace:*",
         "unplugin": "^2.3.4",
