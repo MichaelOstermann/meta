@@ -19,6 +19,6 @@
         "typescript": "^5.8.3",
         "vitepress": "^1.6.3",
         "vitepress-plugin-group-icons": "^1.6.1",
-        "vitest": "^3.2.4"
+        "vitest": "^4.0.0"
     }
 }
