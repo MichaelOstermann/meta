@@ -3,7 +3,12 @@
 exports[`hmr > should inject hmr setup 1`] = `
 "
 const path = "source.ts";
-const hmr = import.meta.hot ? (import.meta.hot.data["@monstermann/meta"] ??= new Set()) : undefined;
-if (hmr) import.meta.hot.dispose(() => { for (const cb of hmr) { hmr.delete(cb); cb(); } });
+const hmr = import.meta.hot ? (import.meta.hot.data["@monstermann/meta"] ??= new globalThis.Set()) : undefined;
+if (hmr) {
+    const clear = () => { for (const cb of hmr) { hmr.delete(cb); cb(); } }
+    clear();
+    import.meta.hot.dispose(clear);
+    import.meta.hot.prune(clear);
+}
 const meta = { path: path, line: 1, name: "example", hmr: hmr };const example = foo(meta)"
 `;

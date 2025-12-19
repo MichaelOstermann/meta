@@ -80,8 +80,13 @@ export class Meta {
     injectHmrSetup(): string {
         if (this.#ids.has("hmr")) return this.#ids.get("hmr")!
         const hmrId = this.generateId("hmr")
-        this.injectCode(`const ${hmrId} = import.meta.hot ? (import.meta.hot.data["@monstermann/meta"] ??= new globalThis.Set()) : undefined;`)
-        this.injectCode(`if (${hmrId}) import.meta.hot.dispose(() => { for (const cb of ${hmrId}) { ${hmrId}.delete(cb); cb(); } });`)
+        this.injectCode(`const ${hmrId} = import.meta.hot ? (import.meta.hot.data["@monstermann/meta"] ??= new globalThis.Set()) : undefined;
+if (${hmrId}) {
+    const clear = () => { for (const cb of ${hmrId}) { ${hmrId}.delete(cb); cb(); } }
+    clear();
+    import.meta.hot.dispose(clear);
+    import.meta.hot.prune(clear);
+}`)
         return hmrId
     }
 
