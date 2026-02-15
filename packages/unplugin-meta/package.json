@@ -107,7 +107,7 @@
     },
     "dependencies": {
         "@monstermann/transform-meta": "workspace:*",
-        "unplugin": "^2.3.4",
+        "unplugin": "^3.0.0",
         "unplugin-utils": "^0.3.0"
     }
 }
