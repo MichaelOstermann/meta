@@ -1,7 +1,7 @@
 {
     "name": "@monstermann/meta",
     "type": "module",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "Tools to attach metadata to call expressions.",
     "author": "Michael Ostermann <michaelostermann@me.com>",
     "license": "MIT",
