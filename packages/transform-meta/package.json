@@ -36,6 +36,6 @@
         "@jridgewell/sourcemap-codec": "^1.5.4",
         "magic-string": "^0.30.17",
         "oxc-parser": "^0.101.0",
-        "oxc-walker": "^0.6.0"
+        "oxc-walker": "^0.7.0"
     }
 }
