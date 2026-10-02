@@ -70,6 +70,29 @@ export default defineConfig({
 - With a `module`, renamed imports (`import { signal as s }`) and namespace imports (`import * as S`) are found, and functions that only share the name are left alone.
 - Calls are skipped when the argument is already taken, or when its position is unknown because of spread arguments.
 
+### Namespaces and classes
+
+`function` follows the members of what is being called:
+
+```ts
+meta({
+    params: [
+        // Rect.create(0, 0) → Rect.create(0, 0, meta)
+        { module: "geometry", function: "Rect.create", position: 3 },
+        // new Store() → new Store(meta)
+        { module: "stores", function: "Store", position: 1 },
+        // Store.from(items) → Store.from(items, meta)
+        { module: "stores", function: "Store.from", position: 2 },
+        // Your own functions, wherever they are imported from or declared:
+        // createThing() → createThing(meta)
+        { function: "createThing", position: 1 },
+    ],
+});
+```
+
+- Methods of instances can only be matched by the name of the variable (`"store.add"` for `store.add()`), and `this.foo()` not at all.
+- Run this plugin before anything that rewrites the calls, such as [`@monstermann/barrels-treeshake`](https://github.com/MichaelOstermann/barrels) turning `Rect.create()` into `_create()`.
+
 ### Standalone
 
 ```ts
