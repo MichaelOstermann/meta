@@ -1,5 +1,5 @@
-import { getMeta } from "./getMeta"
+import { metaStack } from "./metaStack"
 
 export function hasMeta(): boolean {
-    return getMeta() !== undefined
+    return metaStack.at(-1) !== undefined
 }
