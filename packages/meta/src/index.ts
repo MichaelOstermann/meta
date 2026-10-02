@@ -1,5 +1,3 @@
-export * from "./MetaContext"
 export * from "./plugin"
-export * from "./setMetaParam"
-export * from "./transformMeta"
+export * from "./transform"
 export * from "./types"

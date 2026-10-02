@@ -1,12 +1,12 @@
-import type { TransformMetaOptions } from "./types"
-import { transformMeta } from "./transformMeta"
+import type { MetaOptions } from "./types"
+import { transform } from "./transform"
 
-export interface MetaPluginOptions extends TransformMetaOptions {
+export interface MetaPluginOptions extends MetaOptions {
     enforce?: "post" | "pre"
     /** Skip files whose path matches one of these. */
     exclude?: RegExp | RegExp[]
     /**
-     * Whether to attach the HMR handle, see `Meta.hmr`.
+     * Whether to add `Meta.hmr`.
      * @default true when used with the dev server of Vite
      */
     hmr?: boolean
@@ -22,7 +22,7 @@ export interface MetaPlugin {
     name: string
     transform: {
         filter: { id: { exclude: RegExp[], include: RegExp[] } }
-        handler: (code: string, id: string) => ReturnType<typeof transformMeta>
+        handler: (code: string, id: string) => ReturnType<typeof transform>
     }
     configResolved: (config: { command: string }) => void
 }
@@ -45,7 +45,7 @@ export function meta({ enforce, exclude = [], hmr, include = /\.[jt]sx?$/, ...op
                 // Bundlers that do not know hook filters call the handler for every file.
                 if (id.exclude.some(pattern => pattern.test(path))) return
                 if (!id.include.some(pattern => pattern.test(path))) return
-                return transformMeta(code, path, { ...options, hmr: hmr ?? isViteDevServer })
+                return transform(code, path, { ...options, hmr: hmr ?? isViteDevServer })
             },
         },
         configResolved(config) {

@@ -1,9 +1,9 @@
-import type { TransformMetaOptions } from "../src"
+import type { MetaOptions } from "../src"
 import { describe, expect, it } from "bun:test"
-import { setMetaParam, transformMeta } from "../src"
+import { transform } from "../src"
 
-function run(code: string, resolve: TransformMetaOptions["resolve"], options?: Partial<TransformMetaOptions> & { filePath?: string }): string | undefined {
-    return transformMeta(dedent(code), options?.filePath ?? "source.ts", { ...options, resolve })?.code
+function run(code: string, params: MetaOptions["params"], options?: Partial<MetaOptions>): string | undefined {
+    return transform(dedent(code), "source.ts", { ...options, params })?.code
 }
 
 function dedent(code: string): string {
@@ -21,7 +21,7 @@ describe("calls", () => {
             const c = new Foo(bar)
             const d = foo(bar,
             )
-        `, setMetaParam("lib", { foo: 3, Foo: 2 }))).toEndWith(dedent(`
+        `, { lib: { foo: 3, Foo: 2 } })).toEndWith(dedent(`
             const a = foo(undefined, undefined, meta)
             const b = foo(bar, undefined, meta1)
             const c = new Foo(bar, meta2)
@@ -36,7 +36,7 @@ describe("calls", () => {
             const a = foo(bar, baz)
             const b = foo(...args)
             const c = new Foo
-        `, setMetaParam("lib", { foo: 2, Foo: 2 }))).toBe(undefined)
+        `, { lib: { foo: 2, Foo: 2 } })).toBe(undefined)
     })
 })
 
@@ -47,7 +47,7 @@ describe("setMetaParam", () => {
             const a = foo.bar.baz(bar)
             const b = new Foo()
             const c = foo(bar, )
-        `, setMetaParam("lib", { "foo": 2, "Foo": 1, "foo.bar.baz": 2 }))).toBe(dedent(`
+        `, { lib: { "foo": 2, "Foo": 1, "foo.bar.baz": 2 } })).toBe(dedent(`
             import { foo, Foo } from "lib"
             const path = "source.ts";
             const meta = { path: path, line: 2, name: "a" };
@@ -59,13 +59,13 @@ describe("setMetaParam", () => {
         `))
     })
 
-    it("should support multiple resolvers", () => {
+    it("should support multiple modules", () => {
         expect(run(`
             import { foo } from "a"
             import { bar } from "b"
             const a = foo()
             const b = bar()
-        `, [setMetaParam("a", { foo: 1 }), setMetaParam("b", { bar: 2 })])).toEndWith(dedent(`
+        `, { a: { foo: 1 }, b: { bar: 2 } })).toEndWith(dedent(`
             const a = foo(meta)
             const b = bar(undefined, meta1)
         `))
@@ -73,13 +73,13 @@ describe("setMetaParam", () => {
 })
 
 describe("imports", () => {
-    const resolve = setMetaParam("lib", { "default.bar": 1, "foo": 1, "foo.bar": 1 })
+    const params = { lib: { "default.bar": 1, "foo": 1, "foo.bar": 1 } }
 
     it("should match renamed imports", () => {
         expect(run(`
             import { foo as baz } from "lib"
             const a = baz()
-        `, resolve)).toEndWith(`const a = baz(meta)`)
+        `, params)).toEndWith(`const a = baz(meta)`)
     })
 
     it("should match namespace imports", () => {
@@ -87,14 +87,14 @@ describe("imports", () => {
             import * as Lib from "lib"
             const a = Lib.foo()
             const b = Lib.foo.bar()
-        `, resolve)).toEndWith(`const a = Lib.foo(meta)\nconst b = Lib.foo.bar(meta1)`)
+        `, params)).toEndWith(`const a = Lib.foo(meta)\nconst b = Lib.foo.bar(meta1)`)
     })
 
     it("should match default imports", () => {
         expect(run(`
             import Lib from "lib"
             const a = Lib.bar()
-        `, resolve)).toEndWith(`const a = Lib.bar(meta)`)
+        `, params)).toEndWith(`const a = Lib.bar(meta)`)
     })
 
     it("should ignore everything that is not the import", () => {
@@ -110,7 +110,7 @@ describe("imports", () => {
             Foo.foo()
             obj.foo()
             foo["bar"]()
-        `, resolve)).toBe(undefined)
+        `, params)).toBe(undefined)
     })
 
     it("should respect shadowed imports", () => {
@@ -119,7 +119,7 @@ describe("imports", () => {
             function a(foo) { foo() }
             function b() { foo(); function foo() {} }
             function c() { foo() }
-        `, resolve)).toEndWith(dedent(`
+        `, params)).toEndWith(dedent(`
             function a(foo) { foo() }
             function b() { foo(); function foo() {} }
             function c() { foo(meta) }
@@ -128,7 +128,7 @@ describe("imports", () => {
 })
 
 describe("meta", () => {
-    const resolve = setMetaParam("lib", { foo: 1 })
+    const params = { lib: { foo: 1 } }
 
     it("should ensure unique identifiers", () => {
         expect(run(`
@@ -137,7 +137,7 @@ describe("meta", () => {
             const meta = "example"
             const a = foo()
             const b = foo()
-        `, resolve)).toBe(dedent(`
+        `, params)).toBe(dedent(`
             import { foo } from "lib"
             const path1 = "source.ts";
             const meta1 = { path: path1, line: 4, name: "a" };
@@ -164,7 +164,7 @@ describe("meta", () => {
                     this.g = foo()
                 }
             }
-        `, resolve)
+        `, params)
         expect(code).toContain(`{ path: path, line: 3, name: "a" }`)
         expect(code).toContain(`{ path: path, line: 6, name: "b.c" }`)
         expect(code).toContain(`{ path: path, line: 9, name: "D.e" }`)
@@ -175,7 +175,7 @@ describe("meta", () => {
         const code = run(`
             import { foo } from "lib"
             const a = foo()
-        `, resolve, {
+        `, params, {
             getName: () => `say "hi"`,
             getPath: () => "src\\tasks\\new.ts",
         })
@@ -187,13 +187,13 @@ describe("meta", () => {
         const code = run(`
             import { foo } from "lib"
             const a = foo()
-        `, resolve, { hmr: true })
+        `, params, { hmr: true })
         expect(code).toContain(`const hmr = import.meta.hot ? (import.meta.hot.data["@monstermann/meta"] ??= new globalThis.Set()) : undefined;`)
         expect(code).toContain(`const meta = { path: path, line: 2, name: "a", hmr: hmr };`)
     })
 
     it("should create sourcemaps", () => {
-        const result = transformMeta(`import { foo } from "lib"\nfoo()`, "source.ts", { resolve })
+        const result = transform(`import { foo } from "lib"\nfoo()`, "source.ts", { params })
         expect(result!.map.sources).toEqual(["source.ts"])
         expect(result!.map.mappings).toBeTruthy()
     })
