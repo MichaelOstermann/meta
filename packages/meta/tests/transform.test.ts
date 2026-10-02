@@ -134,6 +134,42 @@ describe("imports", () => {
     })
 })
 
+describe("params without a module", () => {
+    it("should match everything that is called by that name", () => {
+        expect(transform(dedent(`
+            import { foo } from "lib"
+            import { foo as bar } from "other"
+            function baz() {}
+            foo()
+            bar()
+            baz()
+            Baz.qux()
+            window.foo()
+        `), "source.ts", {
+            params: [
+                { function: "foo", position: 1 },
+                { function: "baz", position: 2 },
+                { function: "Baz.qux", position: 1 },
+            ],
+        })?.code).toEndWith(dedent(`
+            foo(meta)
+            bar()
+            baz(undefined, meta1)
+            Baz.qux(meta2)
+            window.foo()
+        `))
+    })
+
+    it("should prefer the first matching param", () => {
+        expect(transform(`import { foo } from "lib"\nfoo()`, "source.ts", {
+            params: [
+                { function: "foo", module: "lib", position: 2 },
+                { function: "foo", position: 1 },
+            ],
+        })?.code).toEndWith(`foo(undefined, meta)`)
+    })
+})
+
 describe("meta", () => {
     const params = { lib: { foo: 1 } }
 

@@ -11,10 +11,14 @@ export interface MetaParam {
     /**
      * The function that receives the metadata, as exported by the module:
      * `"signal"`, `"Foo.bar"` for `Foo.bar()`, `"default.bar"` for members of the default export.
+     * Without a module, the name it is called by.
      */
     function: string
-    /** The module the function is imported from. */
-    module: string
+    /**
+     * The module the function is imported from.
+     * Without it, everything that is called by that name is matched, wherever it comes from.
+     */
+    module?: string
     /** The position of the argument, starting at `1`. Missing arguments in between are filled with `undefined`. */
     position: number
 }

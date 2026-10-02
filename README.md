@@ -62,12 +62,12 @@ export default defineConfig({
 
 | Property   | Description                                                                                                                     |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `module`   | The module the function is imported from.                                                                                       |
+| `module`   | The module the function is imported from. Optional, without it everything that is called by that name is matched.               |
 | `function` | Its name as exported by the module: `"signal"`, `"Foo.bar"` for `Foo.bar()`, `"default.bar"` for members of the default export. |
 | `position` | The position of the argument, starting at `1`. Missing arguments in between are filled with `undefined`.                        |
 
 - Works with Vite, Rolldown and tsdown.
-- Renamed imports (`import { signal as s }`) and namespace imports (`import * as S`) are found, functions that only share the name are left alone.
+- With a `module`, renamed imports (`import { signal as s }`) and namespace imports (`import * as S`) are found, and functions that only share the name are left alone.
 - Calls are skipped when the argument is already taken, or when its position is unknown because of spread arguments.
 
 ### Standalone

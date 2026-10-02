@@ -25,7 +25,7 @@ import { getNodeName } from "./getNodeName"
  */
 export function transform(code: string, filePath: string, options: MetaOptions): MetaResult | undefined {
     // Nothing to do when none of the modules are mentioned, skip parsing.
-    if (!options.params.some(param => code.includes(param.module))) return
+    if (!options.params.some(param => code.includes(param.module ?? param.function.split(".")[0]!))) return
 
     const { program } = parseSync(filePath, code)
     const ms = new MagicString(code, { filename: filePath })
@@ -75,15 +75,20 @@ export function transform(code: string, filePath: string, options: MetaOptions):
         },
     }
 
-    /** The position of the meta argument, if what is being called has been imported from one of the modules. */
+    /** The position of the meta argument, if what is being called is one of the params. */
     function getPosition(node: CallExpression | NewExpression): number | undefined {
         const [root, ...properties] = getIdentifiers(node.callee)
         if (!root) return
         const declaration = scopeTracker.getDeclaration(root)
-        if (declaration?.type !== "Import" || declaration.importNode.importKind === "type") return
-        const module = declaration.importNode.source.value
-        const name = getImportedName(declaration.node, properties)
-        return options.params.find(param => param.module === module && param.function === name)?.position
+        const isImport = declaration?.type === "Import" && declaration.importNode.importKind !== "type"
+        const module = isImport ? declaration.importNode.source.value : undefined
+        const importedName = isImport ? getImportedName(declaration.node, properties) : undefined
+        const localName = [root, ...properties].join(".")
+        return options.params.find((param) => {
+            return param.module === undefined
+                ? param.function === localName
+                : param.module === module && param.function === importedName
+        })?.position
     }
 
     /** Whether the argument is not taken yet, and its position is known. */
