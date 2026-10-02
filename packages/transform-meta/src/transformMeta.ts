@@ -15,6 +15,7 @@ export function transformMeta(
     const resolvers = Array.isArray(options.resolve) ? options.resolve : [options.resolve]
 
     walk(meta.ast, {
+        scopeTracker: meta.scopeTracker,
         enter(node) {
             for (const resolve of resolvers) {
                 resolve(node, meta)

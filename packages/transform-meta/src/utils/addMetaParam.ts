@@ -1,9 +1,10 @@
 import type { TransformMetaResolver } from "../types"
 
-export function addMetaParam(identifiers: string[]): TransformMetaResolver {
+/** Appends the metadata to the arguments of the given functions imported from `from`. */
+export function addMetaParam(from: string, identifiers: string[]): TransformMetaResolver {
     return function (node, meta) {
-        const name = meta.getCallExpressionName(node)
-        if (!identifiers.includes(name)) return
+        const name = meta.getImportedCallExpressionName(node, from)
+        if (!identifiers.includes(name) || !meta.canInjectMetaParam(node)) return
         const id = meta.injectMetaRecord({
             line: meta.getMetaLine(node),
             name: meta.getMetaName(node),

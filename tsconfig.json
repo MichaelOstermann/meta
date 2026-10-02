@@ -1,9 +1,7 @@
 {
     "extends": "@monstermann/tsconfig",
     "compilerOptions": {
-        "paths": {
-            "@monstermann/transform-meta": ["./packages/transform-meta/src/index.ts"]
-        }
+        "types": ["bun"]
     },
     "exclude": [
         "**/dist/**",

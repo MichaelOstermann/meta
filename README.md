@@ -4,6 +4,9 @@
 
 **Tools to attach metadata to call expressions.**
 
-[Documentation](https://MichaelOstermann.github.io/meta)
-
 </div>
+
+| Package                                                    | Description                                                                |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [`@monstermann/meta`](./packages/meta)                     | Metadata about call sites: name, path and line.                            |
+| [`@monstermann/transform-meta`](./packages/transform-meta) | Attaches metadata about call sites to the functions that are being called. |

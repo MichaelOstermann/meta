@@ -3,8 +3,8 @@ import type { TransformMetaOptions } from "./types"
 import Path from "node:path"
 import MagicString from "magic-string"
 import { parseSync } from "oxc-parser"
-import { walk } from "oxc-walker"
-import { getCallExpressionName } from "./helpers/getCallExpressionName"
+import { ScopeTracker, walk } from "oxc-walker"
+import { getCallExpressionIdentifiers, getCallExpressionName } from "./helpers/getCallExpressionName"
 import { getNodeName } from "./helpers/getNodeName"
 
 export class Meta {
@@ -12,6 +12,7 @@ export class Meta {
     code: string
     filePath: string
     ms: MagicString
+    scopeTracker = new ScopeTracker({ preserveExitedScopes: true })
     usedIds = new Set<string>()
     #bodyOffset = 0
     #ids = new Map<string, string>()
@@ -40,6 +41,33 @@ export class Meta {
 
     getCallExpressionName(node: Node): string {
         return getCallExpressionName(node)
+    }
+
+    /**
+     * Returns the name of what is being called if it has been imported from `from`, regardless of how it is called locally:
+     *
+     * ```ts
+     * import { foo as bar } from "from"; bar() // "foo"
+     * import { foo } from "from"; foo.bar() // "foo.bar"
+     * import * as Foo from "from"; Foo.bar() // "bar"
+     * import Foo from "from"; Foo.bar() // "default.bar"
+     * ```
+     *
+     * Only works while walking the AST, as it depends on the scope of the node.
+     */
+    getImportedCallExpressionName(node: Node, from: string): string {
+        const [root, ...properties] = getCallExpressionIdentifiers(node)
+        if (!root) return ""
+        const declaration = this.scopeTracker.getDeclaration(root)
+        if (declaration?.type !== "Import") return ""
+        if (declaration.importNode.source.value !== from) return ""
+        if (declaration.importNode.importKind === "type") return ""
+        const specifier = declaration.node
+        if (specifier.type === "ImportNamespaceSpecifier") return properties.join(".")
+        if (specifier.type === "ImportDefaultSpecifier") return ["default", ...properties].join(".")
+        if (specifier.importKind === "type") return ""
+        const imported = specifier.imported.type === "Identifier" ? specifier.imported.name : specifier.imported.value
+        return [imported, ...properties].join(".")
     }
 
     getMetaLine(node: Node): number {
@@ -102,29 +130,33 @@ if (${hmrId}) {
         return id
     }
 
+    /**
+     * Whether a parameter can be added to the call, optionally at the given position (starting at `1`).
+     * This is not the case when the position is already taken, or unknown because of spread arguments.
+     */
+    canInjectMetaParam(node: Node, argPos?: number): boolean {
+        if (node.type !== "CallExpression" && node.type !== "NewExpression") return false
+        // new Foo
+        if (this.code[node.end - 1] !== ")") return false
+        if (argPos == null) return true
+        if (node.arguments.length >= argPos) return false
+        return !node.arguments.some(argument => argument.type === "SpreadElement")
+    }
+
     injectMetaParam(node: Node, metaId: string, argPos?: number): void {
-        if (node.type !== "CallExpression") return
-        let argLen = node.arguments.length
-
-        const prefix = (val: string) => argLen > 0 ? `, ${val}` : val
-        const append = (val: string) => this.ms.appendRight(node.end - 1, prefix(val))
-
-        if (argPos == null) {
-            append(metaId)
-        }
-        else if (argLen < argPos) {
-            for (let i = argLen; i < argPos - 1; i++) {
-                append("undefined")
-                argLen++
-            }
-            append(metaId)
-        }
+        if (node.type !== "CallExpression" && node.type !== "NewExpression") return
+        if (!this.canInjectMetaParam(node, argPos)) return
+        const args = Array.from({ length: (argPos ?? 1) - node.arguments.length - 1 }, () => "undefined").concat(metaId)
+        // foo(bar,)
+        const hasTrailingComma = /,\s*\)$/.test(this.code.slice(node.arguments.at(-1)?.end ?? node.end - 1, node.end))
+        const prefix = node.arguments.length && !hasTrailingComma ? ", " : ""
+        this.ms.appendRight(node.end - 1, prefix + args.join(", "))
     }
 
     injectMetaPath(path: string): string {
         if (!this.#ids.has("path")) {
             const pathId = this.generateId("path")
-            this.injectCode(`const ${pathId} = "${path}";`)
+            this.injectCode(`const ${pathId} = ${JSON.stringify(path)};`)
         }
         return this.#ids.get("path")!
     }
@@ -136,7 +168,7 @@ if (${hmrId}) {
     }): string {
         const metaId = this.generateId("meta")
         const pathId = this.injectMetaPath(path)
-        const props: string[] = [`path: ${pathId}`, `line: ${line}`, `name: "${name}"`]
+        const props: string[] = [`path: ${pathId}`, `line: ${line}`, `name: ${JSON.stringify(name)}`]
         if (this.#options.hmr) props.push(`hmr: ${this.injectHmrSetup()}`)
         this.injectCode(`const ${metaId} = { ${props.join(", ")} };`)
         return metaId
@@ -150,6 +182,7 @@ if (${hmrId}) {
 
     #walkAst() {
         walk(this.ast, {
+            scopeTracker: this.scopeTracker,
             enter: (node, parent) => {
                 if (node.type === "Identifier") this.usedIds.add(node.name)
                 if (node.type === "ImportDeclaration") this.#bodyOffset = node.end
@@ -164,5 +197,7 @@ if (${hmrId}) {
                 if (parent) this.#parentNodes.set(node, parent)
             },
         })
+        // Keep all declarations, including hoisted ones, available for the next walk.
+        this.scopeTracker.freeze()
     }
 }

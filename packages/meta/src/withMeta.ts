@@ -1,4 +1,3 @@
-/* eslint-disable @stylistic/max-statements-per-line */
 import type { Meta } from "./types"
 import { metaStack } from "./metaStack"
 
