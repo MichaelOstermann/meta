@@ -21,7 +21,7 @@ import { signal } from "signals";
 const path = "source.ts";
 const meta = { path: path, line: 3, name: "count" };
 
-const count = signal(0, undefined, meta);
+const count = signal(0, meta);
 ```
 
 ## Installation
@@ -41,14 +41,26 @@ import {
     wrapWithMeta,
 } from "@monstermann/transform-meta";
 
-// signal(0) → signal(0, undefined, meta), unless the third argument is taken
-setMetaParam("signals", { signal: 3 });
+// signal(0) → signal(0, meta), unless the second argument is taken
+// effect(fn) → effect(fn, undefined, meta), missing arguments are filled with undefined
+setMetaParam("signals", { signal: 2, effect: 3 });
 
 // signal(0) → signal(0, meta)
 addMetaParam("signals", ["signal"]);
 
 // signal(0) → withMeta(meta, () => signal(0)), read it with getMeta() from @monstermann/meta
 wrapWithMeta("signals", ["signal"]);
+```
+
+`resolve` takes a list, to cover functions from several modules:
+
+```ts
+transformMeta(code, "source.ts", {
+    resolve: [
+        setMetaParam("signals", { signal: 2 }),
+        setMetaParam("tracer", { trace: 2 }),
+    ],
+});
 ```
 
 Names are relative to the module: `"signal"`, `"Foo.bar"` for `Foo.bar()`, `"default.bar"` for members of the default export.
@@ -59,7 +71,7 @@ Names are relative to the module: `"signal"`, `"Foo.bar"` for `Foo.bar()`, `"def
 import { metaPlugin, setMetaParam } from "@monstermann/transform-meta";
 
 export default defineConfig({
-    plugins: [metaPlugin({ resolve: setMetaParam("signals", { signal: 3 }) })],
+    plugins: [metaPlugin({ resolve: setMetaParam("signals", { signal: 2 }) })],
 });
 ```
 
@@ -69,7 +81,7 @@ export default defineConfig({
 import { setMetaParam, transformMeta } from "@monstermann/transform-meta";
 
 const result = transformMeta(code, "source.ts", {
-    resolve: setMetaParam("signals", { signal: 3 }),
+    resolve: setMetaParam("signals", { signal: 2 }),
 });
 result?.code;
 result?.map;
