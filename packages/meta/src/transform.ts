@@ -1,4 +1,4 @@
-import type { CallExpression, NewExpression, Node } from "oxc-parser"
+import type { CallExpression, ImportDeclarationSpecifier, NewExpression, Node } from "oxc-parser"
 import type { MetaOptions, MetaResult } from "./types"
 import Path from "node:path"
 import MagicString from "magic-string"
@@ -25,7 +25,7 @@ import { getNodeName } from "./getNodeName"
  */
 export function transform(code: string, filePath: string, options: MetaOptions): MetaResult | undefined {
     // Nothing to do when none of the modules are mentioned, skip parsing.
-    if (!Object.keys(options.params).some(from => code.includes(from))) return
+    if (!options.params.some(param => code.includes(param.module))) return
 
     const { program } = parseSync(filePath, code)
     const ms = new MagicString(code, { filename: filePath })
@@ -81,17 +81,9 @@ export function transform(code: string, filePath: string, options: MetaOptions):
         if (!root) return
         const declaration = scopeTracker.getDeclaration(root)
         if (declaration?.type !== "Import" || declaration.importNode.importKind === "type") return
-        const positions = options.params[declaration.importNode.source.value]
-        if (!positions) return
-        const specifier = declaration.node
-        // import * as Foo from "foo"; Foo.bar()
-        if (specifier.type === "ImportNamespaceSpecifier") return positions[properties.join(".")]
-        // import Foo from "foo"; Foo.bar()
-        if (specifier.type === "ImportDefaultSpecifier") return positions[["default", ...properties].join(".")]
-        if (specifier.importKind === "type") return
-        // import { foo as bar } from "foo"; bar()
-        const imported = specifier.imported.type === "Identifier" ? specifier.imported.name : specifier.imported.value
-        return positions[[imported, ...properties].join(".")]
+        const module = declaration.importNode.source.value
+        const name = getImportedName(declaration.node, properties)
+        return options.params.find(param => param.module === module && param.function === name)?.position
     }
 
     /** Whether the argument is not taken yet, and its position is known. */
@@ -158,6 +150,18 @@ if (${id}) {
         }
         return line
     }
+}
+
+/** The name of what is being called, as exported by its module. */
+function getImportedName(specifier: ImportDeclarationSpecifier, properties: string[]): string | undefined {
+    // import * as Foo from "foo"; Foo.bar()
+    if (specifier.type === "ImportNamespaceSpecifier") return properties.join(".")
+    // import Foo from "foo"; Foo.bar()
+    if (specifier.type === "ImportDefaultSpecifier") return ["default", ...properties].join(".")
+    if (specifier.importKind === "type") return
+    // import { foo as bar } from "foo"; bar()
+    const imported = specifier.imported.type === "Identifier" ? specifier.imported.name : specifier.imported.value
+    return [imported, ...properties].join(".")
 }
 
 /** `foo.bar.baz` → `["foo", "bar", "baz"]` */

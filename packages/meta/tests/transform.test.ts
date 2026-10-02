@@ -2,8 +2,15 @@ import type { MetaOptions } from "../src"
 import { describe, expect, it } from "bun:test"
 import { transform } from "../src"
 
-function run(code: string, params: MetaOptions["params"], options?: Partial<MetaOptions>): string | undefined {
-    return transform(dedent(code), "source.ts", { ...options, params })?.code
+/** `{ lib: { foo: 2 } }` → `[{ module: "lib", function: "foo", position: 2 }]` */
+function toParams(modules: Record<string, Record<string, number>>): MetaOptions["params"] {
+    return Object.entries(modules).flatMap(([module, functions]) => {
+        return Object.entries(functions).map(([name, position]) => ({ function: name, module, position }))
+    })
+}
+
+function run(code: string, modules: Record<string, Record<string, number>>, options?: Partial<MetaOptions>): string | undefined {
+    return transform(dedent(code), "source.ts", { ...options, params: toParams(modules) })?.code
 }
 
 function dedent(code: string): string {
@@ -193,7 +200,7 @@ describe("meta", () => {
     })
 
     it("should create sourcemaps", () => {
-        const result = transform(`import { foo } from "lib"\nfoo()`, "source.ts", { params })
+        const result = transform(`import { foo } from "lib"\nfoo()`, "source.ts", { params: toParams(params) })
         expect(result!.map.sources).toEqual(["source.ts"])
         expect(result!.map.mappings).toBeTruthy()
     })

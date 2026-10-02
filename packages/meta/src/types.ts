@@ -7,6 +7,18 @@ export interface Meta {
     readonly path: string
 }
 
+export interface MetaParam {
+    /**
+     * The function that receives the metadata, as exported by the module:
+     * `"signal"`, `"Foo.bar"` for `Foo.bar()`, `"default.bar"` for members of the default export.
+     */
+    function: string
+    /** The module the function is imported from. */
+    module: string
+    /** The position of the argument, starting at `1`. Missing arguments in between are filled with `undefined`. */
+    position: number
+}
+
 export interface MetaOptions {
     /**
      * Whether to add `Meta.hmr`.
@@ -14,18 +26,14 @@ export interface MetaOptions {
      */
     hmr?: boolean
     /**
-     * The functions that receive metadata, by the module they are imported from,
-     * and the position of the argument, starting at `1`:
+     * The functions that receive metadata:
      *
      * ```ts
      * // signal(0) → signal(0, meta)
-     * // effect(fn) → effect(fn, undefined, meta)
-     * { signals: { signal: 2, effect: 3 } }
+     * { module: "signals", function: "signal", position: 2 }
      * ```
-     *
-     * Names are relative to the module: `"signal"`, `"Foo.bar"` for `Foo.bar()`, `"default.bar"` for members of the default export.
      */
-    params: Record<string, Record<string, number>>
+    params: MetaParam[]
     /** Changes the name of a record, which is taken from what the result of the call is assigned to. */
     getName?: (name: string) => string
     /** Changes the path of a module, which is relative to `process.cwd()`. */
