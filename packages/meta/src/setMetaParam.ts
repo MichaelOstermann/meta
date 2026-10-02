@@ -1,4 +1,4 @@
-import type { TransformMetaResolver } from "../types"
+import type { TransformMetaResolver } from "./types"
 
 /** Passes the metadata as the nth argument (starting at `1`) to the given functions imported from `from`, unless that argument is already taken. */
 export function setMetaParam(from: string, identifiers: Record<string, number>): TransformMetaResolver {

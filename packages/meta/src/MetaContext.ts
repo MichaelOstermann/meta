@@ -7,7 +7,8 @@ import { ScopeTracker, walk } from "oxc-walker"
 import { getCallExpressionIdentifiers, getCallExpressionName } from "./helpers/getCallExpressionName"
 import { getNodeName } from "./helpers/getNodeName"
 
-export class Meta {
+/** What a resolver receives to inspect the module and inject metadata. */
+export class MetaContext {
     ast: Program
     code: string
     filePath: string
@@ -118,18 +119,6 @@ if (${hmrId}) {
         return hmrId
     }
 
-    injectImport(code: string): void {
-        this.ms.appendLeft(this.#bodyOffset, `\n${code}`)
-    }
-
-    injectMetaImport(name: string): string {
-        if (this.#ids.has(name)) return this.#ids.get(name)!
-        const id = this.generateId(name)
-        if (id === name) this.injectImport(`import { ${name} } from "@monstermann/meta";`)
-        else this.injectImport(`import { ${name} as ${id} } from "@monstermann/meta";`)
-        return id
-    }
-
     /**
      * Whether a parameter can be added to the call, optionally at the given position (starting at `1`).
      * This is not the case when the position is already taken, or unknown because of spread arguments.
@@ -174,26 +163,12 @@ if (${hmrId}) {
         return metaId
     }
 
-    injectMetaWrapper(node: Node, metaId: string): void {
-        const withMetaId = this.injectMetaImport("withMeta")
-        this.ms.appendLeft(node.start, `${withMetaId}(${metaId}, () => `)
-        this.ms.appendRight(node.end, ")")
-    }
-
     #walkAst() {
         walk(this.ast, {
             scopeTracker: this.scopeTracker,
             enter: (node, parent) => {
                 if (node.type === "Identifier") this.usedIds.add(node.name)
                 if (node.type === "ImportDeclaration") this.#bodyOffset = node.end
-                if (node.type === "ImportDeclaration" && node.source.value === "@monstermann/meta") {
-                    for (const spec of node.specifiers) {
-                        if (spec.type !== "ImportSpecifier") continue
-                        if (spec.imported.type === "Identifier" && spec.local.type === "Identifier") {
-                            this.#ids.set(spec.imported.name, spec.local.name)
-                        }
-                    }
-                }
                 if (parent) this.#parentNodes.set(node, parent)
             },
         })

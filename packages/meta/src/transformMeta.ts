@@ -1,7 +1,7 @@
 import type { SourceMap } from "magic-string"
 import type { TransformMetaOptions } from "./types"
 import { walk } from "oxc-walker"
-import { Meta } from "./Meta"
+import { MetaContext } from "./MetaContext"
 
 export function transformMeta(
     code: string,
@@ -11,7 +11,7 @@ export function transformMeta(
     code: string
     map: SourceMap
 } | undefined {
-    const meta = new Meta(code, filePath, options)
+    const meta = new MetaContext(code, filePath, options)
     const resolvers = Array.isArray(options.resolve) ? options.resolve : [options.resolve]
 
     walk(meta.ast, {

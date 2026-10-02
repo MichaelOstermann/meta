@@ -28,7 +28,7 @@ export interface MetaPlugin {
 }
 
 /** A plugin for Vite, Rolldown and tsdown. */
-export function metaPlugin({ enforce, exclude = [], hmr, include = /\.[jt]sx?$/, ...options }: MetaPluginOptions): MetaPlugin {
+export function meta({ enforce, exclude = [], hmr, include = /\.[jt]sx?$/, ...options }: MetaPluginOptions): MetaPlugin {
     let isViteDevServer = false
 
     const id = {
@@ -38,7 +38,7 @@ export function metaPlugin({ enforce, exclude = [], hmr, include = /\.[jt]sx?$/,
 
     return {
         enforce,
-        name: "transform-meta",
+        name: "meta",
         transform: {
             filter: { id },
             handler(code, path) {

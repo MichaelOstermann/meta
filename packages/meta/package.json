@@ -2,7 +2,7 @@
     "name": "@monstermann/meta",
     "type": "module",
     "version": "0.3.0",
-    "description": "Tools to attach metadata to call expressions.",
+    "description": "Attaches metadata about call sites to the functions that are being called.",
     "author": "Michael Ostermann <michaelostermann@me.com>",
     "license": "MIT",
     "homepage": "https://github.com/MichaelOstermann/meta",
@@ -29,5 +29,13 @@
     ],
     "scripts": {
         "bundle": "tsdown"
+    },
+    "dependencies": {
+        "magic-string": "^1.4.2",
+        "oxc-parser": "^0.152.0",
+        "oxc-walker": "^1.1.1"
+    },
+    "devDependencies": {
+        "rolldown": "1.2.12"
     }
 }

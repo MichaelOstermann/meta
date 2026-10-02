@@ -1,14 +1,14 @@
 import Path from "node:path"
 import { describe, expect, it } from "bun:test"
 import { rolldown } from "rolldown"
-import { addMetaParam, metaPlugin, setMetaParam, transformMeta } from "../src"
+import { meta, setMetaParam, transformMeta } from "../src"
 
 const entry = Path.join(import.meta.dirname, "__fixtures__/entry.ts")
 
-describe("metaPlugin", () => {
+describe("meta", () => {
     it("should skip files that are excluded or not included", () => {
         const code = `import { foo } from "lib"\nfoo()`
-        const plugin = metaPlugin({ exclude: /skipped/, resolve: addMetaParam("lib", ["foo"]) })
+        const plugin = meta({ exclude: /skipped/, resolve: setMetaParam("lib", { foo: 1 }) })
         expect(plugin.transform.handler(code, "/a/b.ts")?.code).toContain("foo(meta)")
         expect(plugin.transform.handler(code, "/a/skipped.ts")).toBe(undefined)
         expect(plugin.transform.handler(code, "/a/b.css")).toBe(undefined)
@@ -16,14 +16,14 @@ describe("metaPlugin", () => {
 
     it("should enable hmr for the dev server of Vite", () => {
         const code = `import { foo } from "lib"\nfoo()`
-        const plugin = metaPlugin({ resolve: addMetaParam("lib", ["foo"]) })
+        const plugin = meta({ resolve: setMetaParam("lib", { foo: 1 }) })
         expect(plugin.transform.handler(code, "/a/b.ts")?.code).not.toContain("import.meta.hot")
         plugin.configResolved({ command: "serve" })
         expect(plugin.transform.handler(code, "/a/b.ts")?.code).toContain("import.meta.hot")
     })
 
     it("should work with rolldown", async () => {
-        const bundle = await rolldown({ input: entry, plugins: [metaPlugin({ resolve: setMetaParam("./lib", { foo: 2 }) })] })
+        const bundle = await rolldown({ input: entry, plugins: [meta({ resolve: setMetaParam("./lib", { foo: 2 }) })] })
         const { output } = await bundle.generate({ format: "esm" })
         expect(output[0].code).toContain(`name: "example"`)
     })

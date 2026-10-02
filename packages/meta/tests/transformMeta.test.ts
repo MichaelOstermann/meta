@@ -1,6 +1,6 @@
 import type { TransformMetaOptions } from "../src"
 import { describe, expect, it } from "bun:test"
-import { addMetaParam, setMetaParam, transformMeta, wrapWithMeta } from "../src"
+import { setMetaParam, transformMeta } from "../src"
 
 function run(code: string, resolve: TransformMetaOptions["resolve"], options?: Partial<TransformMetaOptions> & { filePath?: string }): string | undefined {
     return transformMeta(dedent(code), options?.filePath ?? "source.ts", { ...options, resolve })?.code
@@ -12,44 +12,7 @@ function dedent(code: string): string {
     return lines.map(line => line.slice(indent)).join("\n")
 }
 
-describe("addMetaParam", () => {
-    it("should append to calls, new expressions and members", () => {
-        expect(run(`
-            import { foo, Foo } from "lib"
-            const a = foo()
-            const b = foo(bar)
-            const c = new Foo()
-            const d = new Foo(bar)
-            const e = foo.bar.baz(bar)
-        `, addMetaParam("lib", ["foo", "Foo", "foo.bar.baz"]))).toBe(dedent(`
-            import { foo, Foo } from "lib"
-            const path = "source.ts";
-            const meta = { path: path, line: 2, name: "a" };
-            const meta1 = { path: path, line: 3, name: "b" };
-            const meta2 = { path: path, line: 4, name: "c" };
-            const meta3 = { path: path, line: 5, name: "d" };
-            const meta4 = { path: path, line: 6, name: "e" };
-            const a = foo(meta)
-            const b = foo(bar, meta1)
-            const c = new Foo(meta2)
-            const d = new Foo(bar, meta3)
-            const e = foo.bar.baz(bar, meta4)
-        `))
-    })
-
-    it("should append after spread arguments and trailing commas", () => {
-        expect(run(`
-            import { foo } from "lib"
-            const a = foo(...args)
-            const b = foo(bar, )
-        `, addMetaParam("lib", ["foo"]))).toEndWith(dedent(`
-            const a = foo(...args, meta)
-            const b = foo(bar, meta1)
-        `))
-    })
-})
-
-describe("setMetaParam", () => {
+describe("calls", () => {
     it("should set the nth argument", () => {
         expect(run(`
             import { foo, Foo } from "lib"
@@ -77,49 +40,40 @@ describe("setMetaParam", () => {
     })
 })
 
-describe("wrapWithMeta", () => {
-    it("should wrap calls", () => {
+describe("setMetaParam", () => {
+    it("should support members, new expressions and trailing commas", () => {
         expect(run(`
             import { foo, Foo } from "lib"
-            const a = foo()
+            const a = foo.bar.baz(bar)
             const b = new Foo()
-        `, wrapWithMeta("lib", ["foo", "Foo"]))).toBe(dedent(`
+            const c = foo(bar, )
+        `, setMetaParam("lib", { "foo": 2, "Foo": 1, "foo.bar.baz": 2 }))).toBe(dedent(`
             import { foo, Foo } from "lib"
-            import { withMeta } from "@monstermann/meta";
             const path = "source.ts";
             const meta = { path: path, line: 2, name: "a" };
             const meta1 = { path: path, line: 3, name: "b" };
-            const a = withMeta(meta, () => foo())
-            const b = withMeta(meta1, () => new Foo())
+            const meta2 = { path: path, line: 4, name: "c" };
+            const a = foo.bar.baz(bar, meta)
+            const b = new Foo(meta1)
+            const c = foo(bar, meta2)
         `))
     })
 
-    it("should reuse existing imports", () => {
+    it("should support multiple resolvers", () => {
         expect(run(`
-            import { withMeta as wrap } from "@monstermann/meta";
-            import { foo } from "lib"
+            import { foo } from "a"
+            import { bar } from "b"
             const a = foo()
-        `, wrapWithMeta("lib", ["foo"]))).toEndWith(`const a = wrap(meta, () => foo())`)
-    })
-
-    it("should not introduce conflicting imports", () => {
-        expect(run(`
-            import { foo } from "lib"
-            const withMeta = "example"
-            const a = foo()
-        `, wrapWithMeta("lib", ["foo"]))).toBe(dedent(`
-            import { foo } from "lib"
-            import { withMeta as withMeta1 } from "@monstermann/meta";
-            const path = "source.ts";
-            const meta = { path: path, line: 3, name: "a" };
-            const withMeta = "example"
-            const a = withMeta1(meta, () => foo())
+            const b = bar()
+        `, [setMetaParam("a", { foo: 1 }), setMetaParam("b", { bar: 2 })])).toEndWith(dedent(`
+            const a = foo(meta)
+            const b = bar(undefined, meta1)
         `))
     })
 })
 
 describe("imports", () => {
-    const resolve = addMetaParam("lib", ["foo", "foo.bar", "default.bar"])
+    const resolve = setMetaParam("lib", { "default.bar": 1, "foo": 1, "foo.bar": 1 })
 
     it("should match renamed imports", () => {
         expect(run(`
@@ -174,7 +128,7 @@ describe("imports", () => {
 })
 
 describe("meta", () => {
-    const resolve = addMetaParam("lib", ["foo"])
+    const resolve = setMetaParam("lib", { foo: 1 })
 
     it("should ensure unique identifiers", () => {
         expect(run(`
