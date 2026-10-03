@@ -1,7 +1,7 @@
 {
     "name": "@monstermann/meta",
     "type": "module",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Attaches metadata about call sites to the functions that are being called.",
     "author": "Michael Ostermann <michaelostermann@me.com>",
     "license": "MIT",
