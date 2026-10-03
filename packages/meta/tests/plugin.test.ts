@@ -8,7 +8,7 @@ const entry = Path.join(import.meta.dirname, "__fixtures__/entry.ts")
 describe("meta", () => {
     it("should skip files that are excluded or not included", () => {
         const code = `import { foo } from "lib"\nfoo()`
-        const plugin = meta({ exclude: /skipped/, params: [{ function: "foo", module: "lib", position: 1 }] })
+        const plugin = meta({ exclude: /skipped/, params: [{ function: "foo", module: "lib", position: 1, meta: ({ name }) => ({ name }) }] })
         expect(plugin.transform.handler(code, "/a/b.ts")?.code).toContain("foo(meta)")
         expect(plugin.transform.handler(code, "/a/skipped.ts")).toBe(undefined)
         expect(plugin.transform.handler(code, "/a/b.css")).toBe(undefined)
@@ -16,14 +16,14 @@ describe("meta", () => {
 
     it("should enable hmr for the dev server of Vite", () => {
         const code = `import { foo } from "lib"\nfoo()`
-        const plugin = meta({ params: [{ function: "foo", module: "lib", position: 1 }] })
+        const plugin = meta({ params: [{ function: "foo", module: "lib", position: 1, meta: ({ hmr, name }) => ({ hmr, name }) }] })
         expect(plugin.transform.handler(code, "/a/b.ts")?.code).not.toContain("import.meta.hot")
         plugin.configResolved({ command: "serve" })
         expect(plugin.transform.handler(code, "/a/b.ts")?.code).toContain("import.meta.hot")
     })
 
     it("should work with rolldown", async () => {
-        const bundle = await rolldown({ input: entry, plugins: [meta({ params: [{ function: "foo", module: "./lib", position: 2 }] })] })
+        const bundle = await rolldown({ input: entry, plugins: [meta({ params: [{ function: "foo", module: "./lib", position: 2, meta: ({ name }) => ({ name }) }] })] })
         const { output } = await bundle.generate({ format: "esm" })
         expect(output[0].code).toContain(`name: "example"`)
     })
@@ -38,7 +38,7 @@ describe("transform", () => {
                 setup(build) {
                     build.onLoad({ filter: /\.tsx?$/ }, async ({ loader, path }) => {
                         const code = await Bun.file(path).text()
-                        return { contents: transform(code, path, { params: [{ function: "foo", module: "./lib", position: 2 }] })?.code ?? code, loader }
+                        return { contents: transform(code, path, { params: [{ function: "foo", module: "./lib", position: 2, meta: ({ name }) => ({ name }) }] })?.code ?? code, loader }
                     })
                 },
             }],

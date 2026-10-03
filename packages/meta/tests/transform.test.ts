@@ -1,11 +1,14 @@
-import type { MetaOptions } from "../src"
+import type { MetaOptions, MetaParam } from "../src"
 import { describe, expect, it } from "bun:test"
 import { transform } from "../src"
+
+// eslint-disable-next-line perfectionist/sort-objects
+const all: MetaParam["meta"] = ({ hmr, line, name, path }) => ({ path, line, name, hmr })
 
 /** `{ lib: { foo: 2 } }` → `[{ module: "lib", function: "foo", position: 2 }]` */
 function toParams(modules: Record<string, Record<string, number>>): MetaOptions["params"] {
     return Object.entries(modules).flatMap(([module, functions]) => {
-        return Object.entries(functions).map(([name, position]) => ({ function: name, module, position }))
+        return Object.entries(functions).map(([name, position]) => ({ function: name, meta: all, module, position }))
     })
 }
 
@@ -147,9 +150,9 @@ describe("params without a module", () => {
             window.foo()
         `), "source.ts", {
             params: [
-                { function: "foo", position: 1 },
-                { function: "baz", position: 2 },
-                { function: "Baz.qux", position: 1 },
+                { function: "foo", meta: all, position: 1 },
+                { function: "baz", meta: all, position: 2 },
+                { function: "Baz.qux", meta: all, position: 1 },
             ],
         })?.code).toEndWith(dedent(`
             foo(meta)
@@ -163,8 +166,8 @@ describe("params without a module", () => {
     it("should prefer the first matching param", () => {
         expect(transform(`import { foo } from "lib"\nfoo()`, "source.ts", {
             params: [
-                { function: "foo", module: "lib", position: 2 },
-                { function: "foo", position: 1 },
+                { function: "foo", meta: all, module: "lib", position: 2 },
+                { function: "foo", meta: all, position: 1 },
             ],
         })?.code).toEndWith(`foo(undefined, meta)`)
     })
@@ -215,29 +218,85 @@ describe("meta", () => {
     })
 
     it("should escape paths and names", () => {
-        const code = run(`
-            import { foo } from "lib"
-            const a = foo()
-        `, params, {
-            getName: () => `say "hi"`,
-            getPath: () => "src\\tasks\\new.ts",
-        })
+        const code = transform(`import { foo } from "lib"\nconst a = foo()`, String.raw`src\tasks\new.ts`, {
+            params: [{ function: "foo", module: "lib", position: 1, meta: ({ path }) => ({ name: `say "hi"`, path }) }],
+        })?.code
         expect(code).toContain(String.raw`const path = "src\\tasks\\new.ts";`)
         expect(code).toContain(String.raw`name: "say \"hi\""`)
     })
 
-    it("should inject the hmr setup", () => {
+    it("should inject the hmr setup for params that ask for it", () => {
+        const code = transform(`import { foo, bar } from "lib"\nconst a = foo()\nconst b = bar()`, "source.ts", {
+            hmr: true,
+            params: [
+                { function: "foo", meta: all, module: "lib", position: 1 },
+                { function: "bar", module: "lib", position: 1, meta: ({ name }) => ({ name }) },
+            ],
+        })?.code
+        expect(code).toContain(`const hmr = import.meta.hot ? (import.meta.hot.data["@monstermann/meta"] ??= new globalThis.Set()) : undefined;`)
+        expect(code).toContain(`const meta = { path: path, line: 2, name: "a", hmr: hmr };`)
+        expect(code).toContain(`const meta1 = { name: "b" };`)
+    })
+
+    it("should leave hmr out without the option", () => {
         const code = run(`
             import { foo } from "lib"
             const a = foo()
-        `, params, { hmr: true })
-        expect(code).toContain(`const hmr = import.meta.hot ? (import.meta.hot.data["@monstermann/meta"] ??= new globalThis.Set()) : undefined;`)
-        expect(code).toContain(`const meta = { path: path, line: 2, name: "a", hmr: hmr };`)
+        `, params)
+        expect(code).toContain(`const meta = { path: path, line: 2, name: "a" };`)
+        expect(code).not.toContain("import.meta.hot")
     })
 
     it("should create sourcemaps", () => {
         const result = transform(`import { foo } from "lib"\nfoo()`, "source.ts", { params: toParams(params) })
         expect(result!.map.sources).toEqual(["source.ts"])
         expect(result!.map.mappings).toBeTruthy()
+    })
+})
+
+describe("records", () => {
+    const code = `import { foo } from "lib"\nconst a = foo()`
+    const param = { function: "foo", module: "lib", position: 1 }
+
+    it("should let a param decide what it receives", () => {
+        const result = transform(code, "source.ts", {
+            params: [{ ...param, meta: ({ line, name, path }) => ({ "at": `${path}:${line}`, "debug": true, name, "not-an-identifier": 1, "nothing": null }) }],
+        })?.code
+        expect(result).toContain(`const meta = { at: "source.ts:2", debug: true, name: "a", "not-an-identifier": 1, nothing: null };`)
+        expect(result).toContain("foo(meta)")
+        expect(result).not.toContain("const path")
+    })
+
+    it("should share the path between records", () => {
+        const result = transform(`${code}\nconst b = foo()`, "source.ts", {
+            params: [{ ...param, meta: ({ line, path }) => ({ file: path, line }) }],
+        })?.code
+        expect(result).toContain(`const path = "source.ts";`)
+        expect(result).toContain(`const meta = { file: path, line: 2 };`)
+        expect(result).toContain(`const meta1 = { file: path, line: 3 };`)
+    })
+
+    it("should pass hmr under any name", () => {
+        const result = transform(code, "source.ts", {
+            hmr: true,
+            params: [{ ...param, meta: ({ hmr }) => ({ onReplace: hmr }) }],
+        })?.code
+        expect(result).toContain(`const meta = { onReplace: hmr };`)
+        expect(result).not.toContain("const path")
+    })
+
+    it("should share records that are the same", () => {
+        const result = transform(`${code}\nconst b = foo()`, "source.ts", {
+            hmr: true,
+            params: [{ ...param, meta: ({ hmr }) => ({ hmr }) }],
+        })?.code
+        expect(result).toContain(`const meta = { hmr: hmr };`)
+        expect(result).not.toContain("meta1")
+        expect(result).toContain("const a = foo(meta)\nconst b = foo(meta)")
+    })
+
+    it("should leave calls alone that would receive nothing", () => {
+        expect(transform(code, "source.ts", { params: [{ ...param, meta: ({ hmr }) => ({ hmr }) }] })).toBe(undefined)
+        expect(transform(code, "source.ts", { hmr: true, params: [{ ...param, meta: () => ({}) }] })).toBe(undefined)
     })
 })

@@ -1,10 +1,12 @@
 import type { CallExpression, ImportDeclarationSpecifier, NewExpression, Node } from "oxc-parser"
-import type { MetaOptions, MetaResult } from "./types"
+import type { MetaHmrRef, MetaOptions, MetaParam, MetaResult } from "./types"
 import Path from "node:path"
 import MagicString from "magic-string"
 import { parseSync } from "oxc-parser"
 import { ScopeTracker, walk } from "oxc-walker"
 import { getNodeName } from "./getNodeName"
+
+const hmr = Symbol("hmr") as MetaHmrRef
 
 /**
  * Passes metadata about call sites to the functions that are being called:
@@ -16,8 +18,7 @@ import { getNodeName } from "./getNodeName"
  *
  * ```ts
  * import { signal } from "signals";
- * const path = "source.ts";
- * const meta = { path: path, line: 2, name: "count" };
+ * const meta = { name: "count" };
  * const count = signal(0, meta);
  * ```
  *
@@ -47,15 +48,18 @@ export function transform(code: string, filePath: string, options: MetaOptions):
     const ancestors: Node[] = []
     let pathId: string | undefined
     let hmrId: string | undefined
+    let relativePath: string | undefined
+    const records = new Map<string, string>()
 
     walk(program, {
         scopeTracker,
         enter(node) {
             ancestors.push(node)
             if (node.type !== "CallExpression" && node.type !== "NewExpression") return
-            const position = getPosition(node)
-            if (position === undefined || !isAvailable(node, position)) return
-            inject(node, position, createRecord(node))
+            const param = getParam(node)
+            if (!param || !isAvailable(node, param.position)) return
+            const record = createRecord(node, param)
+            if (record) inject(node, param.position, record)
         },
         leave() {
             ancestors.pop()
@@ -75,8 +79,8 @@ export function transform(code: string, filePath: string, options: MetaOptions):
         },
     }
 
-    /** The position of the meta argument, if what is being called is one of the params. */
-    function getPosition(node: CallExpression | NewExpression): number | undefined {
+    /** The param of what is being called, if it is one of them. */
+    function getParam(node: CallExpression | NewExpression): MetaParam | undefined {
         const [root, ...properties] = getIdentifiers(node.callee)
         if (!root) return
         const declaration = scopeTracker.getDeclaration(root)
@@ -88,7 +92,7 @@ export function transform(code: string, filePath: string, options: MetaOptions):
             return param.module === undefined
                 ? param.function === localName
                 : param.module === module && param.function === importedName
-        })?.position
+        })
     }
 
     /** Whether the argument is not taken yet, and its position is known. */
@@ -107,11 +111,33 @@ export function transform(code: string, filePath: string, options: MetaOptions):
         ms.appendRight(node.end - 1, prefix + args.join(", "))
     }
 
-    function createRecord(node: Node): string {
-        pathId ??= declare("path", JSON.stringify(getPath()))
-        const props = [`path: ${pathId}`, `line: ${getLine(node)}`, `name: ${JSON.stringify(getName())}`]
-        if (options.hmr) props.push(`hmr: ${hmrId ??= createHmr()}`)
-        return declare("meta", `{ ${props.join(", ")} }`)
+    /** Declares what the call receives, if anything. */
+    function createRecord(node: Node, param: MetaParam): string | undefined {
+        const path = getPath()
+        const props: string[] = []
+
+        for (const [key, value] of Object.entries(param.meta({ hmr, line: getLine(node), name: getName(), path }))) {
+            let code: string
+            if (value === hmr) {
+                if (!options.hmr) continue
+                code = hmrId ??= createHmr()
+            }
+            // The path is the same for every record of a module, and declared once.
+            else if (value === path) {
+                code = pathId ??= declare("path", JSON.stringify(path))
+            }
+            else {
+                code = JSON.stringify(value)
+            }
+            props.push(`${/^[a-z_$][\w$]*$/i.test(key) ? key : JSON.stringify(key)}: ${code}`)
+        }
+
+        if (!props.length) return
+        // Calls that receive the same share one record.
+        const record = `{ ${props.join(", ")} }`
+        let id = records.get(record)
+        if (!id) records.set(record, id = declare("meta", record))
+        return id
     }
 
     function createHmr(): string {
@@ -137,15 +163,13 @@ if (${id}) {
     }
 
     function getPath(): string {
-        const path = Path.relative(process.cwd(), Path.resolve(filePath))
-        return options.getPath?.(path) ?? path
+        return relativePath ??= Path.relative(process.cwd(), Path.resolve(filePath))
     }
 
     function getName(): string {
         const names: string[] = []
         for (const node of ancestors) getNodeName(node, names)
-        const name = names.filter(Boolean).join(".")
-        return options.getName?.(name) ?? name
+        return names.filter(Boolean).join(".")
     }
 
     function getLine(node: Node): number {
