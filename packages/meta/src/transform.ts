@@ -1,5 +1,5 @@
 import type { CallExpression, ImportDeclarationSpecifier, NewExpression, Node } from "oxc-parser"
-import type { MetaHmrRef, MetaOptions, MetaParam, MetaResult } from "./types"
+import type { MetaHmrRef, MetaOptions, MetaParam, MetaRecord, MetaResult } from "./types"
 import Path from "node:path"
 import MagicString from "magic-string"
 import { parseSync } from "oxc-parser"
@@ -7,6 +7,18 @@ import { ScopeTracker, walk } from "oxc-walker"
 import { getNodeName } from "./getNodeName"
 
 const hmr = Symbol("hmr") as MetaHmrRef
+const identifier = /^[a-z_$][\w$]*$/i
+const reserved = new Set("arguments await break case catch class const continue debugger default delete do else enum eval export extends false finally for function if implements import in instanceof interface let new null package private protected public return static super switch this throw true try typeof var void while with yield".split(" "))
+
+type MetaProp = [key: string, value: MetaRecord[string]]
+
+interface MetaCall {
+    /** Identifies the record, calls with the same key share one. */
+    key: string
+    node: CallExpression | NewExpression
+    position: number
+    props: MetaProp[]
+}
 
 /**
  * Passes metadata about call sites to the functions that are being called:
@@ -46,10 +58,8 @@ export function transform(code: string, filePath: string, options: MetaOptions):
     scopeTracker.freeze()
 
     const ancestors: Node[] = []
-    let pathId: string | undefined
-    let hmrId: string | undefined
+    const calls: MetaCall[] = []
     let relativePath: string | undefined
-    const records = new Map<string, string>()
 
     walk(program, {
         scopeTracker,
@@ -58,15 +68,36 @@ export function transform(code: string, filePath: string, options: MetaOptions):
             if (node.type !== "CallExpression" && node.type !== "NewExpression") return
             const param = getParam(node)
             if (!param || !isAvailable(node, param.position)) return
-            const record = createRecord(node, param)
-            if (record) inject(node, param.position, record)
+            const props = getProps(node, param)
+            if (!props.length) return
+            const key = JSON.stringify(props.map(([key, value]) => value === hmr ? [key] : [key, value]))
+            calls.push({ key, node, position: param.position, props })
         },
         leave() {
             ancestors.pop()
         },
     })
 
-    if (!ms.hasChanged()) return
+    if (!calls.length) return
+
+    // Calls that receive the same share one record.
+    const records = new Map<string, MetaProp[]>()
+    for (const call of calls) records.set(call.key, call.props)
+
+    // Strings that are used more than once are declared once.
+    const counts = new Map<string, number>()
+    for (const props of records.values()) {
+        for (const [, value] of props) {
+            if (typeof value === "string" && value) counts.set(value, (counts.get(value) ?? 0) + 1)
+        }
+    }
+
+    const strings = new Map<string, string>()
+    const recordIds = new Map<string, string>()
+    let hmrId: string | undefined
+
+    for (const [key, props] of records) recordIds.set(key, declare("meta", createRecord(props)))
+    for (const call of calls) inject(call.node, call.position, recordIds.get(call.key)!)
 
     return {
         code: ms.toString(),
@@ -111,32 +142,23 @@ export function transform(code: string, filePath: string, options: MetaOptions):
         ms.appendRight(node.end - 1, prefix + args.join(", "))
     }
 
-    /** Declares what the call receives, if anything. */
-    function createRecord(node: Node, param: MetaParam): string | undefined {
-        const path = getPath()
-        const props: string[] = []
+    /** What the call receives, if anything. */
+    function getProps(node: Node, param: MetaParam): MetaProp[] {
+        const record = param.meta({ hmr, line: getLine(node), name: getName(), path: getPath() })
+        return Object.entries(record).filter(([, value]) => value !== hmr || options.hmr)
+    }
 
-        for (const [key, value] of Object.entries(param.meta({ hmr, line: getLine(node), name: getName(), path }))) {
-            let code: string
-            if (value === hmr) {
-                if (!options.hmr) continue
-                code = hmrId ??= createHmr()
-            }
-            // The path is the same for every record of a module, and declared once.
-            else if (value === path) {
-                code = pathId ??= declare("path", JSON.stringify(path))
-            }
-            else {
-                code = JSON.stringify(value)
-            }
-            props.push(`${/^[a-z_$][\w$]*$/i.test(key) ? key : JSON.stringify(key)}: ${code}`)
-        }
+    function createRecord(props: MetaProp[]): string {
+        const entries = props.map(([key, value]) => `${identifier.test(key) ? key : JSON.stringify(key)}: ${createValue(key, value)}`)
+        return `{ ${entries.join(", ")} }`
+    }
 
-        if (!props.length) return
-        // Calls that receive the same share one record.
-        const record = `{ ${props.join(", ")} }`
-        let id = records.get(record)
-        if (!id) records.set(record, id = declare("meta", record))
+    function createValue(key: string, value: MetaProp[1]): string {
+        if (value === hmr) return hmrId ??= createHmr()
+        if (typeof value !== "string" || (counts.get(value) ?? 0) < 2) return JSON.stringify(value)
+        // Named after the first property it is used by.
+        let id = strings.get(value)
+        if (!id) strings.set(value, id = declare(identifier.test(key) && !reserved.has(key) ? key : "value", JSON.stringify(value)))
         return id
     }
 

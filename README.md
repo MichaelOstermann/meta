@@ -18,8 +18,7 @@ After:
 
 ```ts
 import { signal } from "signals";
-const path = "source.ts";
-const meta = { path: path, line: 3, name: "count" };
+const meta = { path: "source.ts", line: 3, name: "count" };
 
 const count = signal(0, meta);
 ```
@@ -81,6 +80,7 @@ export default defineConfig({
 - With a `module`, renamed imports (`import { signal as s }`) and namespace imports (`import * as S`) are found, and functions that only share the name are left alone.
 - Calls are skipped when the argument is already taken, when its position is unknown because of spread arguments, or when the record is empty.
 - Calls that receive the same share one record.
+- Strings that are used more than once are declared once and shared between the records.
 
 ### Namespaces and classes
 

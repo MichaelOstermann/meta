@@ -221,7 +221,7 @@ describe("meta", () => {
         const code = transform(`import { foo } from "lib"\nconst a = foo()`, String.raw`src\tasks\new.ts`, {
             params: [{ function: "foo", module: "lib", position: 1, meta: ({ path }) => ({ name: `say "hi"`, path }) }],
         })?.code
-        expect(code).toContain(String.raw`const path = "src\\tasks\\new.ts";`)
+        expect(code).toContain(String.raw`path: "src\\tasks\\new.ts"`)
         expect(code).toContain(String.raw`name: "say \"hi\""`)
     })
 
@@ -234,7 +234,7 @@ describe("meta", () => {
             ],
         })?.code
         expect(code).toContain(`const hmr = import.meta.hot ? (import.meta.hot.data["@monstermann/meta"] ??= new globalThis.Set()) : undefined;`)
-        expect(code).toContain(`const meta = { path: path, line: 2, name: "a", hmr: hmr };`)
+        expect(code).toContain(`const meta = { path: "source.ts", line: 2, name: "a", hmr: hmr };`)
         expect(code).toContain(`const meta1 = { name: "b" };`)
     })
 
@@ -243,7 +243,7 @@ describe("meta", () => {
             import { foo } from "lib"
             const a = foo()
         `, params)
-        expect(code).toContain(`const meta = { path: path, line: 2, name: "a" };`)
+        expect(code).toContain(`const meta = { path: "source.ts", line: 2, name: "a" };`)
         expect(code).not.toContain("import.meta.hot")
     })
 
@@ -267,13 +267,27 @@ describe("records", () => {
         expect(result).not.toContain("const path")
     })
 
-    it("should share the path between records", () => {
-        const result = transform(`${code}\nconst b = foo()`, "source.ts", {
-            params: [{ ...param, meta: ({ line, path }) => ({ file: path, line }) }],
+    it("should share strings that are used more than once", () => {
+        const result = transform(`${code}\nconst b = foo()\nconst c = foo()`, "source.ts", {
+            params: [{ ...param, meta: ({ line, name, path }) => ({ "class": "shared", "file": path, "kind": name === "a" ? "first" : "rest", line, "none": "", "not-an-identifier": "other" }) }],
         })?.code
-        expect(result).toContain(`const path = "source.ts";`)
-        expect(result).toContain(`const meta = { file: path, line: 2 };`)
-        expect(result).toContain(`const meta1 = { file: path, line: 3 };`)
+        expect(result).toContain(dedent(`
+            const value = "shared";
+            const file = "source.ts";
+            const value1 = "other";
+            const meta = { class: value, file: file, kind: "first", line: 2, none: "", "not-an-identifier": value1 };
+            const kind = "rest";
+            const meta1 = { class: value, file: file, kind: kind, line: 3, none: "", "not-an-identifier": value1 };
+            const meta2 = { class: value, file: file, kind: kind, line: 4, none: "", "not-an-identifier": value1 };
+        `))
+    })
+
+    it("should not count the strings of shared records twice", () => {
+        const result = transform(`${code}\nconst a = foo()`, "source.ts", {
+            params: [{ ...param, meta: ({ name, path }) => ({ name, path }) }],
+        })?.code
+        expect(result).toContain(`const meta = { name: "a", path: "source.ts" };`)
+        expect(result).not.toContain("meta1")
     })
 
     it("should pass hmr under any name", () => {
